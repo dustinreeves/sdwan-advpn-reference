@@ -57,13 +57,13 @@ config system dhcp server
   {% if i.dhcp_server|default(true) %}
   edit {{ 10 + loop.index0 }}
     set dns-service default
-    set default-gateway {{ i.ip|ipaddr('address') }}
-    set netmask {{ i.ip|ipaddr('netmask') }}
+    set default-gateway {{ i.ip|ansible.utils.ipaddr('address') }}
+    set netmask {{ i.ip|ansible.utils.ipaddr('netmask') }}
     set interface {{ i.name }}
     config ip-range
       edit 1
-        set start-ip {{ i.ip|ipaddr(4)|ipaddr('address') }}
-        set end-ip {{ i.ip|ipaddr(-5)|ipaddr('address') }}
+        set start-ip {{ i.ip|ansible.utils.ipaddr(4)|ansible.utils.ipaddr('address') }}
+        set end-ip {{ i.ip|ansible.utils.ipaddr(-5)|ansible.utils.ipaddr('address') }}
       next
     end
   next

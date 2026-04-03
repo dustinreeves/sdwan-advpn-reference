@@ -1,0 +1,12 @@
+---
+- name: Render {{ current_tpl }} for {{ device_name }}
+  ansible.builtin.set_fact:
+    rendered_sections: "{{ rendered_sections + [ section ] }}"
+  vars:
+    rendered_raw: "{{ lookup('ansible.builtin.template', repo_root ~ '/' ~ flavor_rel ~ '/' ~ current_tpl) }}"
+    rendered_clean: "{{ rendered_raw.split('\n') | select('match', '\\S') | list | join('\n') }}"
+    section: |
+      ######################################
+      # {{ current_tpl }}
+      ######################################
+      {{ rendered_clean }}

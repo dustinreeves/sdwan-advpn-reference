@@ -212,22 +212,18 @@ they are not configured explicitly):
 
 ## Setting Per-Device Context
 
-On the most important tasks when onboarding a new device will be to assign it to the
-right region and the device profile, selecting one of the objects described in the Project template.
+One of the most important onboarding tasks is assigning each device to the
+right `region` and `profile`, selecting objects defined in the Project template.
 
-This assignment can be done using FortiManager device meta fields `region` and `profile` respectively.
+In this repository, per-device context is provided through the Ansible inventory
+JSON file (`<flavor>/projects/inventory.json`).
 
-Apart from these two variables, several other per-device variables are used inside the provided
-templates set, and hence it is important to create the respective meta fields and set their per-device values.
+Apart from `region` and `profile`, additional per-device variables are consumed
+by the template set. Some values in the Project template may also need to be
+device-specific (for example, LAN interface addresses). In those cases, define
+variables in the inventory and reference them directly in `Project.j2`.
 
-Finally, several parameters described in this reference will typically have different values for different sites.
-Consider, for example, the IP address parameter under the device profile.
-Each device will have its own IP address, while the Project template remains the same.
-
-FortiManager meta fields can also be used to solve this problem. Any per-device value should be defined
-as a meta field, which can be then referred in the Project template. For example,
-the following snippet will use the meta field `lan_ip` to statically define different IP address
-for each rendered device:
+For example, this snippet uses an inventory variable `lan_ip`:
 
 ```
 {# Device Profiles #}
@@ -245,15 +241,14 @@ for each rendered device:
 %}
 ```
 
-To summarize, when onboarding a new device, the following three types of meta fields must be set:
+To summarize, when onboarding a new device, define three categories of values
+in inventory:
 
-1. The meta fields `region` and `profile`, correctly classifying the device in the project
+1. Classification variables: `region` and `profile`
+1. Variables implicitly used by the provided templates
+1. Variables explicitly referenced by your `Project` template
 
-1. The meta fields implicitly used by the provided templates
-
-1. The meta fields explicitly used in your Project template
-
-The following table summarizes all the required per-device meta fields:
+The following table summarizes all commonly required per-device variables:
 
 | Parameter        | Values      | Description                                                            | Example        |
 |------------------|-------------|------------------------------------------------------------------------|----------------|
@@ -264,6 +259,6 @@ The following table summarizes all the required per-device meta fields:
 | lan_ip           | \<ip/mask\> | LAN interface IP (and mask) _(only in provided examples)_              | '10.0.1.1/24'  |
 | mpls_wan_ip      | \<ip/mask\> | MPLS interface IP (and mask) _(only in provided examples)_             | '172.16.0.1/2  |
 | mpls_wan_gateway | \<ip\>      | Next-hop gateway for MPLS transport _(only in provided examples)_      | '172.16.0.2'   |
-| outbandwidth     | \<int\      | Egress WAN bandwidth _(only in provided examples)_                     | '8000'         |
-| inbandwidth      | \<int\      | Ingress WAN bandwidth _(only in provided examples)_                    | '8000'         |
-| shaping_profile  | \<str\      | Shaping profile to apply to WAN underlay _(only in provided examples)_ | 'Edge_Shaping' |
+| outbandwidth     | \<int\>     | Egress WAN bandwidth _(only in provided examples)_                     | '8000'         |
+| inbandwidth      | \<int\>     | Ingress WAN bandwidth _(only in provided examples)_                    | '8000'         |
+| shaping_profile  | \<str\>     | Shaping profile to apply to WAN underlay _(only in provided examples)_ | 'Edge_Shaping' |

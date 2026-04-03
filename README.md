@@ -1,181 +1,88 @@
-# Jinja CLI Templates for Fortinet SD-WAN/ADVPN
+# Ansible Jinja Templates for SD-WAN/ADVPN
 
-FortiManager 7.0.1+ includes built-in Jinja engine that allows you to use Jinja syntax for CLI Templates.
-This repository contains generic, ready-to-use templates that generate our best-practice SD-WAN/ADVPN configuration.
-These templates are easily tunable for your projects, as will be briefly explained below.
-
-Our [Secure SD-WAN Deployment Guide for Service Providers (Release 7.0)](https://docs.fortinet.com/document/fortigate/7.0.0/sd-wan-deployment-for-mssps/705134/introduction) contains more information
-about using these templates for your projects.
-
-Additionally, we provide an Ansible-based renderer, which you can use to render the templates without FortiManager.
-It will generate a set of plain-text files with FOS configuration for each device, which you can simply copy-paste to your
-FortiGate devices (or use the [Configuration Scripts](https://docs.fortinet.com/document/fortigate/7.0.6/administration-guide/780930/configuration-scripts) feature).
-This method is handy to build a quick and simple lab or to quickly validate the changes made to your Jinja templates.
-
+This repository provides Jinja-based FortiGate CLI templates and an **Ansible-native** renderer.
+It is focused on building and validating SD-WAN/ADVPN configurations directly from project data,
+without external management platform dependencies.
 
 ## Routing Design Flavors
 
-Currently we provide two main routing design flavors - each under its own directory:
+Two design flavors are provided:
 
-- **"BGP per Overlay"** is the traditional routing design for our SD-WAN/ADVPN deployments,
-  in which a separate IBGP session is established over each overlay between an Edge device and a Hub.
-  This IBGP session is terminated on the tunnel IP of both sides. For each LAN prefix,
-  multiple BGP routes are generated (one route per overlay), and all these routes
-  are propagated across the network.
+- **BGP per Overlay** (`bgp-per-overlay/`)
+- **BGP on Loopback** (`bgp-on-loopback/`)
 
-- **"BGP on Loopback"** is a new alternative supported for our SD-WAN/ADVPN deployments starting from FOS 7.0.4.
-  With this routing design, a single IBGP session is established between an Edge device and a Hub.
-  This IBGP session is terminated on the loopback interface on both sides, but the routes are
-  recursively resolved via all available overlays. For each LAN prefix, a single BGP route
-  is generated and propagated across the network.
+Each flavor contains equivalent structure and template stages.
 
-Please refer to our Deployment Guide or consult your Fortinet representatives, in order to select
-a design flavor which is the most suitable for your project.
+## Repository Structure
 
+Within each flavor directory:
 
-## File Structure
+- `??-Edge-*.j2`, `??-Hub-*.j2` — core underlay/overlay/routing templates.
+- `projects/Project*.j2` — project-level data model template(s).
+- `projects/inventory.json` — per-device variables and device grouping.
+- `optional/*.j2` — optional security and SD-WAN templates.
+- `pre-run/*.j2` — bootstrap templates for platform-specific first-time setup.
+- `rendered/` — sample rendered outputs.
 
-We provide a separate set of templates for each design flavor, each under its own directory.
-Once you make your choice, simply use only the templates from the respective directory.
+Renderer assets:
 
-The file structure for all the design flavors is identical, as follows:
+- `ansible/render_config.yml` — main Ansible playbook.
+- `ansible/render_device_group.yml` — group rendering workflow.
+- `ansible/render_single_device.yml` — per-device rendering workflow.
 
-- **??-Edge-\*.j2, ??-Hub-\*.j2** - the templates configuring Underlay, Overlay and Routing pillars.
-  Normally, there will be no need to edit these files, as they are already designed to generate our
-  best-practice configuration.
+## Prerequisites
 
-- **projects** - this sub-directory contains:
+- Ansible (2.12+ recommended)
+- `ansible.utils` collection (for `ipaddr` Jinja filter used by templates)
 
-  - Examples of Project Templates (**Project.\*.j2**). Those are the most crucial files from the users' perspective.
-    This is where you "tune" the templates to your project(s).
-    We recommend starting from one of the provided Project Templates and modifying it to match your requirements.
-    Normally, this will be the only file that you must modify per project.
+Install collection if needed:
 
-  - Example of inventory file in JSON format, listing the devices and their respective per-device variables.
-    This file is used by the provided Python renderer.
-    When using FortiManager, this file is not needed (but it will show you what per-device variables to set).
-
-- **optional** - additional templates configuring Security and SD-WAN pillars.
-  Normally, they are not used when configuring your solution with FortiManager.
-  But they are used by the provided Python renderer, so that the generated FOS configuration is complete.
-
-- **pre-run** - sub-directory that contains the Pre-Run CLI Templates for different
-  FortiGate models. [Pre-Run CLI Templates](https://docs.fortinet.com/document/fortimanager/7.0.0/new-features/195747/pre-run-cli-template-runs-once-on-model-device-to-preconfigure-it-with-required-settings-7-0-2) are not mandatory, but you may need to use
-  them depending on your environment.
-
-- **rendered** - sub-directory that contains a fully rendered FOS configuration, as an example.
-
-Additionally, in the root directory you will find the legacy Python renderer (**render_config.py**), and under **ansible/** you will find
-the recommended Ansible renderer (**ansible/render_config.yml**).
-
-
-## How-To: Deploy with FortiManager
-
-Follow these steps:
-
-1. Download the selected design flavor
-
-1. Edit the `Project` template to describe your project. Use your favorite plain text editor
-   (how about trying [Atom](https://atom.io/) or [Visual Studio Code](https://code.visualstudio.com/)?).
-   The guidelines to describe your project will follow below.
-   There is no need to edit any other files.
-
-1. Import the edited `Project` template into your FortiManager.
-   Remember to set its type to "Jinja Script".
-   Create the missing meta fields, when prompted.
-
-1. Import the rest of the templates from the set ("as is"), setting their type to "Jinja Script" as well.
-   Create the missing meta fields, when prompted.  
-
-   You DO NOT need to import the "optional" templates, but you MAY need to use one of the "pre-run" templates.
-   For example, when deploying your solution on FortiGate-VM devices, use the "pre-run/FGTVM-initial.j2" template.
-   Remember to specify that it is a "Pre-Run" template, in addition to setting its type to "Jinja Script".
-
-1. Create CLI Template Groups for your Hubs and Edges, as follows:
-
-   - Edge-Template:
-     - 01-Edge-Underlay
-     - 02-Edge-Overlay
-     - 03-Edge-Routing
-
-   - Hub-Template
-     - 01-Hub-Underlay
-     - 02-Hub-Overlay
-     - 03-Hub-Routing
-     - 04-Hub-MultiRegion
-
-1. Deploy your devices, filling in per-device meta fields and assigning the above CLI Template Groups to them.
-
-
-## How-To: Use the Ansible Renderer
-
-1. Clone the repository
-
-1. Edit the `Project` template to describe your project.
-
-1. Prepare an inventory file, setting per-device variables
-
-1. Render the desired design flavor, as follows:
-
-    ```
-    ansible-playbook ansible/render_config.yml -e flavor=<flavor_dir> \
-      -e inventory=<inventory_file> -e project=<project_template> -e outdir=<output_dir>
-    ```
-
-By default, the rendered configuration will be saved under "out" sub-directory.
-Also by default, example Project and inventory files will be used under the selected flavor directory (`projects/Project.j2` and `projects/inventory.json` respectively).
-You can skip the optional templates with `-e skip_optional=true`.
-
-Rendering example:
-
-```
-% ansible-playbook ansible/render_config.yml -e flavor=bgp-on-loopback
-
-PLAY [Render Fortinet SD-WAN/ADVPN templates] *********************************
-
-TASK [Render each device configuration] ****************************************
-changed: [localhost] => (item=Hub / site1-H1)
-changed: [localhost] => (item=Hub / site1-H2)
-changed: [localhost] => (item=Hub / site2-H1)
-changed: [localhost] => (item=Edge / site1-1)
-changed: [localhost] => (item=Edge / site1-2)
-changed: [localhost] => (item=Edge / site2-1)
-
-PLAY RECAP *********************************************************************
-localhost                  : ok=9    changed=3    unreachable=0    failed=0
-
-% ls out
-site1-1		site1-2		site1-H1	site1-H2	site2-1		site2-H1
+```bash
+ansible-galaxy collection install ansible.utils
 ```
 
+## Rendering with Ansible
 
-## Describing Your Project
+Basic usage:
 
-The `Project` template contains comments inside that should be useful to understand its contents.
-Pay special attention to the syntax - it must be a valid Jinja.
-It is recommended to validate the syntax using any online Jinja validation tool, such as [this](https://j2live.ttl255.com/). If there are no syntax errors, the rendering
-will return an empty result (since the `Project` template is only defining data structures).
+```bash
+ansible-playbook ansible/render_config.yml -e flavor=bgp-on-loopback
+```
 
-The template contains the following sections:
+Full parameterized usage:
 
-- **Mandatory Global Definitions** for your project, such as your corporate LAN summary
+```bash
+ansible-playbook ansible/render_config.yml \
+  -e flavor=<flavor_dir> \
+  -e inventory=<inventory_file> \
+  -e project=<project_template> \
+  -e outdir=<output_dir> \
+  -e skip_optional=true
+```
 
-- **Optional Settings** to control the resulting configuration (you can keep them all commented out for the default behavior)
+Defaults:
 
-- **Regions** describe the regions in your project, including the list of Hubs servicing each region
+- `inventory`: `<flavor>/projects/inventory.json`
+- `project`: `<flavor>/projects/Project.j2`
+- `outdir`: `out`
+- `skip_optional`: `false`
 
-- **Profiles** describe device profiles, mainly physical connectivity of your different sites (LAN ports, WAN ports, whether DHCP is present etc.)
+## Project Customization Workflow
 
-- **Hubs** describe all the Hubs in your project, mainly the overlays that they create (and how Edges can connect to them)
+1. Pick one flavor (`bgp-on-loopback` or `bgp-per-overlay`).
+2. Edit the project template (`projects/Project.j2` or `Project.nocert.j2`).
+3. Populate per-device variables in `projects/inventory.json`.
+4. Run the Ansible renderer.
+5. Validate rendered output under your selected output directory.
 
-We recommend that you start from the pre-configured examples and adjust them as necessary!  
-A complete up-to-date reference listing all the currently supported parameters in the Project template is available in [this](./Project_Template_Reference.md) file.
+## Project Template Reference
 
-For more details, please refer to our Deployment Guide or consult your Fortinet representatives.
+Detailed parameter documentation is in:
 
+- [`Project_Template_Reference.md`](./Project_Template_Reference.md)
 
-## Example Project
+## Example Topology
 
-All the provided examples and the rendered configuration refer to the following project:
+All provided samples refer to:
 
 ![](example_project.png)
