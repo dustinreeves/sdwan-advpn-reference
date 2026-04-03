@@ -20,7 +20,7 @@ config router bgp
     {% for h in project.regions[region].hubs %}
     {% set hubloop = loop %}
     {% for i in project.profiles[profile].interfaces if i.role == 'wan' %}
-    edit {{ project.hubs[h].overlays[i.ol_type].tunnel_net|ipaddr(1)|ipaddr('address') }}
+    edit {{ project.hubs[h].overlays[i.ol_type].tunnel_net|ansible.utils.ipaddr(1)|ansible.utils.ipaddr('address') }}
       set soft-reconfiguration enable
       set advertisement-interval 1
       set link-down-failover enable
@@ -35,7 +35,7 @@ config router bgp
   config network
     {% for i in project.profiles[profile].interfaces if i.role == 'lan' and i.advertise|default(true) %}
     edit {{ loop.index }}
-      set prefix {{ i.ip|ipaddr(0) }}
+      set prefix {{ i.ip|ansible.utils.ipaddr(0) }}
     next
     {% endfor %}
   end

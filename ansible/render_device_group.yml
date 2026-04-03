@@ -1,0 +1,19 @@
+---
+- name: Build template order for {{ device_group.key }}
+  ansible.builtin.set_fact:
+    group_templates: >-
+      {{
+        (root_templates + ((skip_optional | default(false) | bool) | ternary([], optional_templates)))
+        | select('search', device_group.key)
+        | list
+        | sort
+      }}
+
+- name: Render each {{ device_group.key }} device
+  ansible.builtin.include_tasks: render_single_device.yml
+  loop: "{{ device_group.value | dict2items }}"
+  loop_control:
+    loop_var: device
+  vars:
+    device_name: "{{ device.key }}"
+    device_vars: "{{ device.value }}"

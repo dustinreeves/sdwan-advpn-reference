@@ -1,0 +1,23 @@
+---
+- name: Load device variables for {{ device_name }}
+  ansible.builtin.set_fact:
+    "{{ item.key }}": "{{ item.value }}"
+  loop: "{{ device_vars | dict2items }}"
+
+- name: Initialize rendered sections for {{ device_name }}
+  ansible.builtin.set_fact:
+    rendered_sections: []
+
+- name: Render templates for {{ device_name }}
+  ansible.builtin.include_tasks: render_template_section.yml
+  loop: "{{ group_templates }}"
+  loop_control:
+    loop_var: tpl
+  vars:
+    current_tpl: "{{ tpl }}"
+
+- name: Write output for {{ device_name }}
+  ansible.builtin.copy:
+    dest: "{{ repo_root }}/{{ outdir_rel }}/{{ device_name }}"
+    content: "{{ rendered_sections | join('\n') | trim }}\n"
+    mode: "0644"

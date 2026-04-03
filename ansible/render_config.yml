@@ -1,41 +1,69 @@
 ---
-- name: Render Fortinet SD-WAN/ADVPN templates via Ansible build wrapper
+- name: Render SD-WAN/ADVPN templates with native Ansible
   hosts: localhost
   gather_facts: false
+  collections:
+    - ansible.utils
 
   vars:
+    ansible_error_on_undefined_vars: false
     repo_root: "{{ playbook_dir | dirname }}"
     flavor_rel: "{{ flavor }}"
-    inventory_rel: "{{ inventory | default('') }}"
-    project_rel: "{{ project | default('') }}"
+    inventory_rel: "{{ inventory | default(flavor_rel ~ '/projects/inventory.json') }}"
+    project_rel: "{{ project | default(flavor_rel ~ '/projects/Project.j2') }}"
     outdir_rel: "{{ outdir | default('out') }}"
 
   tasks:
-    - name: Validate flavor directory was provided
+    - name: Validate required paths
       ansible.builtin.assert:
         that:
           - flavor is defined
           - flavor | length > 0
           - (repo_root ~ '/' ~ flavor_rel) is directory
-        fail_msg: "Set -e flavor=<design flavor directory>, for example bgp-on-loopback"
+          - (repo_root ~ '/' ~ inventory_rel) is file
+          - (repo_root ~ '/' ~ project_rel) is file
+        fail_msg: >-
+          Set -e flavor=<design flavor directory> and ensure inventory/project exist.
 
-    - name: Build renderer command
+    - name: Ensure output directory exists
+      ansible.builtin.file:
+        path: "{{ repo_root }}/{{ outdir_rel }}"
+        state: directory
+        mode: "0755"
+
+    - name: Load inventory data
       ansible.builtin.set_fact:
-        render_cmd: >-
-          python {{ repo_root }}/render_config.py
-          -f {{ flavor_rel }}
-          -o {{ outdir_rel }}
-          {% if inventory_rel | length > 0 %}-i {{ inventory_rel }}{% endif %}
-          {% if project_rel | length > 0 %}-p {{ project_rel }}{% endif %}
-          {% if skip_optional | default(false) | bool %}--skip-optional{% endif %}
+        devices: "{{ lookup('ansible.builtin.file', repo_root ~ '/' ~ inventory_rel) | from_json }}"
 
-    - name: Run renderer
-      ansible.builtin.command:
-        cmd: "{{ render_cmd }}"
-        chdir: "{{ repo_root }}"
-      register: render_result
-      changed_when: true
+    - name: Build template lists
+      ansible.builtin.set_fact:
+        root_templates: >-
+          {{
+            lookup('ansible.builtin.fileglob', repo_root ~ '/' ~ flavor_rel ~ '/*.j2', wantlist=True)
+            | map('basename')
+            | list
+          }}
+        optional_templates: >-
+          {{
+            lookup('ansible.builtin.fileglob', repo_root ~ '/' ~ flavor_rel ~ '/optional/*.j2', wantlist=True)
+            | map('basename')
+            | map('regex_replace', '^(.*)$', 'optional/\\1')
+            | list
+          }}
 
-    - name: Print renderer output
-      ansible.builtin.debug:
-        msg: "{{ render_result.stdout_lines }}"
+    - name: Place active Project template for Jinja includes
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/{{ project_rel }}"
+        dest: "{{ repo_root }}/{{ flavor_rel }}/Project"
+        mode: "0644"
+
+    - name: Render all devices by group
+      ansible.builtin.include_tasks: render_device_group.yml
+      loop: "{{ devices | dict2items }}"
+      loop_control:
+        loop_var: device_group
+
+    - name: Remove temporary Project include file
+      ansible.builtin.file:
+        path: "{{ repo_root }}/{{ flavor_rel }}/Project"
+        state: absent
