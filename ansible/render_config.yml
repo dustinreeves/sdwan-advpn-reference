@@ -1,0 +1,91 @@
+---
+- name: Render FortiGate SD-WAN/ADVPN configs (Ansible only)
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    repo_root: "{{ playbook_dir | dirname }}"
+    flavor_rel: "{{ flavor }}"
+    flavor_abs: "{{ repo_root }}/{{ flavor_rel }}"
+    inventory_rel: "{{ inventory | default(flavor_rel ~ '/projects/inventory.json') }}"
+    inventory_abs: "{{ repo_root }}/{{ inventory_rel }}"
+    project_rel: "{{ project | default(flavor_rel ~ '/projects/Project.j2') }}"
+    project_abs: "{{ repo_root }}/{{ project_rel }}"
+    outdir_abs: "{{ repo_root }}/{{ outdir | default('out') }}"
+
+  tasks:
+    - name: Validate input paths
+      ansible.builtin.assert:
+        that:
+          - flavor is defined
+          - flavor | length > 0
+          - flavor_abs is directory
+          - inventory_abs is file
+          - project_abs is file
+        fail_msg: "Set -e flavor=<flavor_dir> and ensure project/inventory files exist"
+
+    - name: Ensure output directory exists
+      ansible.builtin.file:
+        path: "{{ outdir_abs }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render all configs
+      block:
+        - name: Copy Project file where templates import it
+          ansible.builtin.copy:
+            src: "{{ project_abs }}"
+            dest: "{{ item }}"
+            mode: "0644"
+          loop:
+            - "{{ flavor_abs }}/Project"
+            - "{{ flavor_abs }}/optional/Project"
+
+        - name: Load inventory JSON
+          ansible.builtin.include_vars:
+            file: "{{ inventory_abs }}"
+            name: devices
+
+        - name: Collect base templates
+          ansible.builtin.find:
+            paths: "{{ flavor_abs }}"
+            patterns: "*.j2"
+            file_type: file
+            recurse: false
+          register: base_templates
+
+        - name: Collect optional templates
+          ansible.builtin.find:
+            paths: "{{ flavor_abs }}/optional"
+            patterns: "*.j2"
+            file_type: file
+          register: optional_templates
+          when: not (skip_optional | default(false) | bool)
+
+        - name: Build template pool (relative to flavor)
+          ansible.builtin.set_fact:
+            template_pool: >-
+              {{
+                (base_templates.files | map(attribute='path') | map('basename') | list)
+                +
+                ((optional_templates.files | default([]))
+                | map(attribute='path')
+                | map('regex_replace', '^' ~ (flavor_abs | regex_escape) ~ '/', '')
+                | list)
+              }}
+
+        - name: Render per-group/per-device output files
+          ansible.builtin.include_tasks: tasks/render_group.yml
+          loop: "{{ devices | dict2items }}"
+          loop_control:
+            loop_var: group_item
+            label: "{{ group_item.key }}"
+
+      always:
+        - name: Remove temporary Project files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ flavor_abs }}/Project"
+            - "{{ flavor_abs }}/optional/Project"

@@ -1,0 +1,14 @@
+---
+- name: Render devices in group {{ group_item.key }}
+  ansible.builtin.copy:
+    dest: "{{ outdir_abs }}/{{ device_item.key }}"
+    mode: "0644"
+    content: "{{ lookup('ansible.builtin.template', playbook_dir ~ '/templates/device_config.j2') }}"
+  vars:
+    templates_for_group: "{{ template_pool | select('search', group_item.key) | list | sort }}"
+    flavor_template_root: "{{ flavor_abs }}"
+    device_vars: "{{ device_item.value }}"
+  loop: "{{ group_item.value | dict2items }}"
+  loop_control:
+    loop_var: device_item
+    label: "{{ group_item.key }} / {{ device_item.key }}"

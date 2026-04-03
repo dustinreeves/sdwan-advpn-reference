@@ -17,7 +17,7 @@ config system interface
     set ip {{ i.ip }}
     {% endif %}
     {# Support VLAN interfaces #}
-    {% if i.vlanid and i.interface %}
+    {% if (i.vlanid | default(false)) and (i.interface | default(false)) %}
     set vdom "root"
     set type vlan
     set vlanid {{ i.vlanid }}

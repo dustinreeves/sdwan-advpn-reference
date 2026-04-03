@@ -1,0 +1,8 @@
+{% for tpl in templates_for_group %}
+{% set rendered = lookup('ansible.builtin.template', flavor_template_root ~ '/' ~ tpl, template_vars=device_vars) %}
+######################################
+# {{ tpl }}
+######################################
+{{ rendered.split('\n') | map('trim') | reject('equalto', '') | join('\n') }}
+
+{% endfor %}
