@@ -7,7 +7,7 @@ These templates are easily tunable for your projects, as will be briefly explain
 Our [Secure SD-WAN Deployment Guide for Service Providers (Release 7.0)](https://docs.fortinet.com/document/fortigate/7.0.0/sd-wan-deployment-for-mssps/705134/introduction) contains more information
 about using these templates for your projects.
 
-Additionally, we provide a simple renderer written in Python, which you can use to render the templates without FortiManager.
+Additionally, we provide an Ansible-based renderer, which you can use to render the templates without FortiManager.
 It will generate a set of plain-text files with FOS configuration for each device, which you can simply copy-paste to your
 FortiGate devices (or use the [Configuration Scripts](https://docs.fortinet.com/document/fortigate/7.0.6/administration-guide/780930/configuration-scripts) feature).
 This method is handy to build a quick and simple lab or to quickly validate the changes made to your Jinja templates.
@@ -65,7 +65,8 @@ The file structure for all the design flavors is identical, as follows:
 
 - **rendered** - sub-directory that contains a fully rendered FOS configuration, as an example.
 
-Additionally, in the root directory you will find the Python renderer (**render_config.py**).
+Additionally, in the root directory you will find the legacy Python renderer (**render_config.py**), and under **ansible/** you will find
+the recommended Ansible renderer (**ansible/render_config.yml**).
 
 
 ## How-To: Deploy with FortiManager
@@ -106,7 +107,7 @@ Follow these steps:
 1. Deploy your devices, filling in per-device meta fields and assigning the above CLI Template Groups to them.
 
 
-## How-To: Use the Python Renderer
+## How-To: Use the Ansible Renderer
 
 1. Clone the repository
 
@@ -117,27 +118,31 @@ Follow these steps:
 1. Render the desired design flavor, as follows:
 
     ```
-    ./render_config.py -f <flavor_dir> -i <inventory_file> -p <project_template>
+    ansible-playbook ansible/render_config.yml -e flavor=<flavor_dir> \
+      -e inventory=<inventory_file> -e project=<project_template> -e outdir=<output_dir>
     ```
 
 By default, the rendered configuration will be saved under "out" sub-directory.
-Also by default, example Project and inventory files will be used under the selected flavor directory ("projects/Project.j2" and "projects/inventory.json" respectively).
+Also by default, example Project and inventory files will be used under the selected flavor directory (`projects/Project.j2` and `projects/inventory.json` respectively).
+You can skip the optional templates with `-e skip_optional=true`.
 
 Rendering example:
 
 ```
-% ./render_config.py -f bgp-on-loopback
-Rendering group 'Hub'...
-['01-Hub-Underlay.j2', '02-Hub-Overlay.j2', '03-Hub-Routing.j2', '04-Hub-MultiRegion.j2', 'optional/05-Hub-SDWAN.j2', 'optional/06-Hub-Firewall.j2']
-Rendering device site1-H1...
-Rendering device site1-H2...
-Rendering device site2-H1...
-Rendering group 'Edge'...
-['01-Edge-Underlay.j2', '02-Edge-Overlay.j2', '03-Edge-Routing.j2', 'optional/05-Edge-SDWAN.j2', 'optional/06-Edge-Firewall.j2']
-Rendering device site1-1...
-Rendering device site1-2...
-Rendering device site2-1...
-Rendering complete.
+% ansible-playbook ansible/render_config.yml -e flavor=bgp-on-loopback
+
+PLAY [Render Fortinet SD-WAN/ADVPN templates] *********************************
+
+TASK [Render each device configuration] ****************************************
+changed: [localhost] => (item=Hub / site1-H1)
+changed: [localhost] => (item=Hub / site1-H2)
+changed: [localhost] => (item=Hub / site2-H1)
+changed: [localhost] => (item=Edge / site1-1)
+changed: [localhost] => (item=Edge / site1-2)
+changed: [localhost] => (item=Edge / site2-1)
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=9    changed=3    unreachable=0    failed=0
 
 % ls out
 site1-1		site1-2		site1-H1	site1-H2	site2-1		site2-H1

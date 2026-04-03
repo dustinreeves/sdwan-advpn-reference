@@ -1,8 +1,15 @@
 #!/usr/local/bin/python
 
-import argparse, json, textwrap, jinja2, shutil
-from ansible_collections.ansible.utils.plugins.filter.ipaddr import ipaddr
-from os import listdir, chdir, path, makedirs, remove
+import argparse, json, textwrap, jinja2, shutil, sys
+from os import listdir, path, makedirs, remove
+from pathlib import Path
+
+try:
+    from ansible_collections.ansible.utils.plugins.filter.ipaddr import ipaddr
+except ModuleNotFoundError:
+    # Fallback for local installs where the Ansible collections path is not on sys.path.
+    sys.path.append(str(Path.home() / '.ansible' / 'collections'))
+    from ansible_collections.ansible.utils.plugins.filter.ipaddr import ipaddr
 
 #############################################
 
