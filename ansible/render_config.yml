@@ -1,0 +1,41 @@
+---
+- name: Render Fortinet SD-WAN/ADVPN templates via Ansible build wrapper
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    repo_root: "{{ playbook_dir | dirname }}"
+    flavor_rel: "{{ flavor }}"
+    inventory_rel: "{{ inventory | default('') }}"
+    project_rel: "{{ project | default('') }}"
+    outdir_rel: "{{ outdir | default('out') }}"
+
+  tasks:
+    - name: Validate flavor directory was provided
+      ansible.builtin.assert:
+        that:
+          - flavor is defined
+          - flavor | length > 0
+          - (repo_root ~ '/' ~ flavor_rel) is directory
+        fail_msg: "Set -e flavor=<design flavor directory>, for example bgp-on-loopback"
+
+    - name: Build renderer command
+      ansible.builtin.set_fact:
+        render_cmd: >-
+          python {{ repo_root }}/render_config.py
+          -f {{ flavor_rel }}
+          -o {{ outdir_rel }}
+          {% if inventory_rel | length > 0 %}-i {{ inventory_rel }}{% endif %}
+          {% if project_rel | length > 0 %}-p {{ project_rel }}{% endif %}
+          {% if skip_optional | default(false) | bool %}--skip-optional{% endif %}
+
+    - name: Run renderer
+      ansible.builtin.command:
+        cmd: "{{ render_cmd }}"
+        chdir: "{{ repo_root }}"
+      register: render_result
+      changed_when: true
+
+    - name: Print renderer output
+      ansible.builtin.debug:
+        msg: "{{ render_result.stdout_lines }}"
